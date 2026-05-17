@@ -1,12 +1,13 @@
-node_modules
+bin
 dist
 coverage
+*.test
+*.out
 .env
 .env.*
-npm-debug.log*
-.npm
 .git
 .github
 Dockerfile
 Dockerfile.*
-*.md
+README.md
+

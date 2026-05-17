@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM deps AS builder
+COPY tsconfig.json ./
+COPY src/ ./src/
+RUN npm run build
+
+FROM node:20-alpine AS prod-deps
+ENV NODE_ENV=production
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev \
+    && npm cache clean --force
+
+FROM node:20-alpine AS production
+
+LABEL org.opencontainers.image.title="production-node-app" \
+      org.opencontainers.image.description="Multi-stage Docker image for the production Node.js sample app"
+
+ENV NODE_ENV=production \
+    PORT=3000
+
+WORKDIR /app
+
+RUN addgroup -g 1001 -S appgroup \
+    && adduser -u 1001 -S -D -G appgroup appuser
+
+COPY --from=prod-deps --chown=appuser:appgroup /app/node_modules ./node_modules
+COPY --from=builder --chown=appuser:appgroup /app/dist ./dist
+COPY --chown=appuser:appgroup package.json ./
+
+USER appuser
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health || exit 1
+
+CMD ["node", "dist/server.js"]
+

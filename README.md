@@ -121,6 +121,42 @@ All Dockerfiles follow production best practices:
 - **Layer caching** — dependencies installed before source code copy
 - **Minimal base images** — Alpine / slim / scratch variants
 
+## Single-Stage vs Multi-Stage Demo
+
+Each app includes two Dockerfiles for image-size comparison:
+
+| App | Single-stage | Multi-stage |
+|-----|--------------|-------------|
+| Node | `node-app/Dockerfile.single` | `node-app/Dockerfile.multi` |
+| Python | `python-app/Dockerfile.single` | `python-app/Dockerfile.multi` |
+| Go | `go-app/Dockerfile.single` | `go-app/Dockerfile.multi` |
+| Production Node | `production-node-app/Dockerfile.single` | `production-node-app/Dockerfile.multi` |
+
+```bash
+docker build -f node-app/Dockerfile.single -t docker-lab-node-app:single node-app
+docker build -f node-app/Dockerfile.multi -t docker-lab-node-app:multi node-app
+
+docker build -f python-app/Dockerfile.single -t docker-lab-python-app:single python-app
+docker build -f python-app/Dockerfile.multi -t docker-lab-python-app:multi python-app
+
+docker build -f go-app/Dockerfile.single -t docker-lab-go-app:single go-app
+docker build -f go-app/Dockerfile.multi -t docker-lab-go-app:multi go-app
+
+docker build -f production-node-app/Dockerfile.single -t docker-lab-production-node-app:single production-node-app
+docker build -f production-node-app/Dockerfile.multi -t docker-lab-production-node-app:multi production-node-app
+
+docker image ls docker-lab-node-app
+docker image ls docker-lab-python-app
+docker image ls docker-lab-go-app
+docker image ls docker-lab-production-node-app
+```
+
+GitHub Actions are split into separate workflows:
+
+- `.github/workflows/test.yml` — app build and smoke tests
+- `.github/workflows/docker-build.yml` — builds both Dockerfile variants and writes image-size tables to the workflow summary
+- `.github/workflows/docker-push.yml` — pushes both variants to GHCR on tags, releases, or manual dispatch
+
 ## Docker Volume Persistence Demo
 
 See [docker-volume-test.md](docker-volume-test.md) for a step-by-step walkthrough demonstrating data persistence across container restarts using named volumes with PostgreSQL.

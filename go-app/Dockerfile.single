@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1
+
+FROM golang:1.22-alpine
+
+LABEL org.opencontainers.image.title="go-app" \
+      org.opencontainers.image.description="Single-stage Docker image for the DevOps course Go sample app"
+
+WORKDIR /app
+
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -g 1001 -S appgroup \
+    && adduser -u 1001 -S -D -G appgroup appuser
+
+COPY go.mod go.sum ./
+RUN go mod download \
+    && go mod verify
+
+COPY cmd/ ./cmd/
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags="-w -s -X main.version=1.0.0" \
+    -o /usr/local/bin/server ./cmd/server
+
+USER appuser
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/server"]
+

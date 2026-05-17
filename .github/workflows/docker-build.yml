@@ -1,0 +1,80 @@
+name: Build Docker Images
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: node-app
+            context: node-app
+          - app: python-app
+            context: python-app
+          - app: go-app
+            context: go-app
+          - app: production-node-app
+            context: production-node-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build single-stage image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile.single
+          load: true
+          tags: local/${{ matrix.app }}:single
+
+      - name: Build multi-stage image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile.multi
+          load: true
+          tags: local/${{ matrix.app }}:multi
+
+      - name: Compare image sizes
+        run: |
+          single_size=$(docker image inspect local/${{ matrix.app }}:single --format '{{.Size}}')
+          multi_size=$(docker image inspect local/${{ matrix.app }}:multi --format '{{.Size}}')
+          diff=$((single_size - multi_size))
+
+          if [ "${single_size}" -gt 0 ]; then
+            savings=$(awk "BEGIN { printf \"%.1f\", (${diff} / ${single_size}) * 100 }")
+          else
+            savings="0.0"
+          fi
+
+          {
+            echo "### ${{ matrix.app }}"
+            echo
+            echo "| Variant | Size | Bytes |"
+            echo "| --- | ---: | ---: |"
+            echo "| Single-stage | $(numfmt --to=iec --suffix=B "${single_size}") | ${single_size} |"
+            echo "| Multi-stage | $(numfmt --to=iec --suffix=B "${multi_size}") | ${multi_size} |"
+            echo
+            echo "**Multi-stage savings:** $(numfmt --to=iec --suffix=B "${diff}") (${savings}%)"
+          } >> "${GITHUB_STEP_SUMMARY}"
+

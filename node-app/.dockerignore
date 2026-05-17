@@ -9,4 +9,5 @@ npm-debug.log*
 .github
 Dockerfile
 Dockerfile.*
-*.md
+README.md
+
